@@ -1,2 +1,4 @@
 # Huellitas-Callejeras_PI-2_BD
-En este repositorio esta alojado la base de datos el proyecto integrador huellitas callejeras
+
+
+En este repositorio estara la Base de datos del proyecto Huellitas Callejeras

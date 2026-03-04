@@ -1,31 +1,25 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: postgres:${POSTGRES_VERSION}
-    container_name: ${CONTAINER_NAME}
+  database:
+    # Si tienes imagen personalizada:
+    image: derekortiz/hc-database:latest
+    # Si usas imagen oficial, por ejemplo:
+    # image: postgres:15
+    restart: always
+    ports:
+      - "5432:5432"   # Solo si necesitas acceso externo
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
     volumes:
-      - ./schema_HC-1.2.sql:/docker-entrypoint-initdb.d/01-schema_HC-1.2.sql
-      - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
-      - ./init-migrations.sh:/docker-entrypoint-initdb.d/00-init-migrations.sh
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data   # Persistencia
     networks:
-      - huellitas_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - app-network   # Opcional, si otros contenedores en la misma máquina
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   postgres_data:
-
-networks:
-  huellitas_network:
-    driver: bridge
+    driver: local

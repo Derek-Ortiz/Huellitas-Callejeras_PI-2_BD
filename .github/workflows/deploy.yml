@@ -1,0 +1,91 @@
+name: Deploy Database
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'database/**'               # Solo si cambia la BD
+      - 'docker-compose.database.yml'
+      - '.github/workflows/deploy-database.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Login a Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # (Opcional) Construir y subir imagen de BD si es personalizada
+      - name: Build y Push imagen de base de datos
+        uses: docker/build-push-action@v5
+        with:
+          context: ./database          # Ruta del Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/hc-database:latest
+
+      # Copiar archivos de configuración a EC2
+      - name: Copiar archivos de configuración
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_DATABASE_HOST }}    # IP de la instancia BD
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.database.yml"
+          target: "/home/ubuntu/database"
+
+      # Desplegar en EC2
+      - name: Deploy con Docker Compose
+        uses: appleboy/ssh-action@v1
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}       # Variables de BD
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+        with:
+          host: ${{ secrets.EC2_DATABASE_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DOCKERHUB_TOKEN,DOCKERHUB_USERNAME,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB
+          script: |
+            # Login a Docker Hub
+            echo $DOCKERHUB_TOKEN | docker login --username $DOCKERHUB_USERNAME --password-stdin
+
+            cd /home/ubuntu/database
+
+            # Crear archivo .env con las credenciales
+            cat > .env << 'ENVFILE'
+            POSTGRES_USER=$POSTGRES_USER
+            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+            POSTGRES_DB=$POSTGRES_DB
+            ENVFILE
+
+            echo "=== .env creado ==="
+            cat .env
+
+            # Detener contenedores actuales (sin borrar volúmenes)
+            docker-compose -f docker-compose.database.yml down || true
+
+            # Limpiar recursos no usados (IMPORTANTE: sin --volumes para no borrar datos)
+            docker system prune -af
+
+            # Descargar nueva imagen
+            docker-compose -f docker-compose.database.yml pull
+
+            # Levantar la base de datos
+            docker-compose -f docker-compose.database.yml up -d
+
+            # Verificar estado
+            sleep 5
+            docker-compose -f docker-compose.database.yml ps
+
+            # Mostrar logs
+            echo "=== Database Logs ==="
+            docker-compose -f docker-compose.database.yml logs --tail=50 database

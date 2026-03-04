@@ -1,9 +1,7 @@
 services:
   database:
-    # Si tienes imagen personalizada:
-    image: derekortiz/hc-database:latest
-    # Si usas imagen oficial, por ejemplo:
-    # image: postgres:15
+    # Usando imagen oficial de PostgreSQL
+    image: postgres:15-alpine
     restart: always
     ports:
       - "5432:5432"   # Solo si necesitas acceso externo

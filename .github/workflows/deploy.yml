@@ -4,8 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'database/**'               ## Solo si cambia la BD
-      - 'docker-compose.database.yml'
+      - 'migrations/**'             ## Solo si cambia las migraciones
+      - 'schema_HC-1.2.sql'         ## O el esquema
+      - 'docker-compose.yml'
       - '.github/workflows/deploy.yml'
 
 jobs:
@@ -22,13 +23,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # (Opcional) Construir y subir imagen de BD si es personalizada
-      - name: Build y Push imagen de base de datos
-        uses: docker/build-push-action@v5
-        with:
-          context: ./database          # Ruta del Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/hc-database:latest
+      # Nota: No hay Dockerfile, se usa imagen oficial de postgres
 
       # Copiar archivos de configuración a EC2
       - name: Copiar archivos de configuración
@@ -37,8 +32,8 @@ jobs:
           host: ${{ secrets.EC2_DATABASE_HOST }}    # IP de la instancia BD
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.database.yml"
-          target: "/home/ubuntu/database"
+          source: "docker-compose.yml,migrations/,schema_HC-1.2.sql,init-migrations.sh"
+          target: "/home/ubuntu/hc-database"
 
       # Desplegar en EC2
       - name: Deploy con Docker Compose
@@ -58,7 +53,7 @@ jobs:
             # Login a Docker Hub
             echo $DOCKERHUB_TOKEN | docker login --username $DOCKERHUB_USERNAME --password-stdin
 
-            cd /home/ubuntu/database
+            cd /home/ubuntu/hc-database
 
             # Crear archivo .env con las credenciales
             cat > .env << 'ENVFILE'
@@ -71,21 +66,21 @@ jobs:
             cat .env
 
             # Detener contenedores actuales (sin borrar volúmenes)
-            docker-compose -f docker-compose.database.yml down || true
+            docker-compose down || true
 
             # Limpiar recursos no usados (IMPORTANTE: sin --volumes para no borrar datos)
             docker system prune -af
 
             # Descargar nueva imagen
-            docker-compose -f docker-compose.database.yml pull
+            docker-compose pull
 
             # Levantar la base de datos
-            docker-compose -f docker-compose.database.yml up -d
+            docker-compose up -d
 
             # Verificar estado
             sleep 5
-            docker-compose -f docker-compose.database.yml ps
+            docker-compose ps
 
             # Mostrar logs
             echo "=== Database Logs ==="
-            docker-compose -f docker-compose.database.yml logs --tail=50 database
+            docker-compose logs --tail=50 database

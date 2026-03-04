@@ -6,7 +6,7 @@ on:
     paths:
       - 'database/**'               ## Solo si cambia la BD
       - 'docker-compose.database.yml'
-      - '.github/workflows/deploy-database.yml'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:

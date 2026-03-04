@@ -11,6 +11,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data   # Persistencia
+      - ./schema_HC-1.2.sql:/docker-entrypoint-initdb.d/01-schema_HC-1.2.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ./init-migrations.sh:/docker-entrypoint-initdb.d/02-init-migrations.sh:ro
     networks:
       - app-network   # Opcional, si otros contenedores en la misma máquina
 

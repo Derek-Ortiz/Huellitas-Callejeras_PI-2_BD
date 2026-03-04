@@ -5,10 +5,13 @@ echo "================================"
 echo "Inicializando base de datos HC..."
 echo "================================"
 
+DB_USER="${POSTGRES_USER:-postgres}"
+DB_NAME="${POSTGRES_DB:-postgres}"
+
 # Ejecutar el schema principal
 if [ -f /docker-entrypoint-initdb.d/01-schema_HC-1.2.sql ]; then
     echo "Ejecutando schema principal (01-schema_HC-1.2.sql)..."
-    psql -U admin -d postgres -f /docker-entrypoint-initdb.d/01-schema_HC-1.2.sql
+    psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -f /docker-entrypoint-initdb.d/01-schema_HC-1.2.sql
     echo "✓ Schema principal ejecutado"
 fi
 
@@ -25,7 +28,7 @@ if [ -d "$MIGRATIONS_DIR" ]; then
         
         if [ -f "$migration_file" ]; then
             echo "Ejecutando migración: $migration_name..."
-            psql -U admin -d postgres -f "$migration_file"
+            psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -f "$migration_file"
             echo "✓ Migración $migration_name completada"
         fi
     done

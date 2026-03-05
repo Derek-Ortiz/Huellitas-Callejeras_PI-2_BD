@@ -71,7 +71,31 @@ jobs:
             # Levantar la base de datos
             docker-compose up -d
 
-            # Verificar estado
+            # Esperar a que PostgreSQL esté listo
+            sleep 10
+
+            # Verificar si las tablas existen, si no, ejecutar inicialización
+            TABLE_COUNT=$(docker-compose exec -T database psql -U $POSTGRES_USER -d $POSTGRES_DB -tc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null || echo "0")
+            
+            if [ "$TABLE_COUNT" -lt 5 ]; then
+              echo "⚠️  Tablas no encontradas, ejecutando inicialización..."
+              docker-compose exec -T database psql -U $POSTGRES_USER -d $POSTGRES_DB -f /docker-entrypoint-initdb.d/01-init.sql
+              
+              # Ejecutar migraciones en orden
+              for migration_folder in $(ls -d /docker-entrypoint-initdb.d/migrations/*/ 2>/dev/null | sort); do
+                migration_name=$(basename "$migration_folder")
+                migration_file="$migration_folder/migration.sql"
+                if [ -f "$migration_file" ]; then
+                  echo "Ejecutando migración: $migration_name..."
+                  docker-compose exec -T database psql -U $POSTGRES_USER -d $POSTGRES_DB -f "$migration_file"
+                fi
+              done
+              echo "✓ Inicialización completada"
+            else
+              echo "✓ Base de datos ya inicializada ($TABLE_COUNT tablas encontradas)"
+            fi
+
+            # Verificar estado final
             sleep 5
             docker-compose ps
 

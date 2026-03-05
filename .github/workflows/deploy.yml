@@ -25,14 +25,13 @@ jobs:
 
       # Nota: No hay Dockerfile, se usa imagen oficial de postgres
 
-      # Copiar archivos de configuración a EC2
       - name: Copiar archivos de configuración
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_DATABASE_HOST }}    # IP de la instancia BD
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,migrations/,schema_HC-1.2.sql,init-migrations.sh"
+          source: "docker-compose.yml,migrations/,docker-entrypoint-init.sql"
           target: "/home/ubuntu/hc-database"
 
       # Desplegar en EC2
